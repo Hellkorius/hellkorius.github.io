@@ -241,7 +241,7 @@ export const FamilyTreeCanvas: React.FC<FamilyTreeCanvasProps> = ({
       >
         {({ canvasRef, zoom, pan }) => (
           <>
-            <svg className="connections-svg" style={{ width: '100%', height: '100%' }}>
+            <svg className="connections-svg" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
               <defs>
                 <marker
                   id="arrowhead"
@@ -254,7 +254,6 @@ export const FamilyTreeCanvas: React.FC<FamilyTreeCanvasProps> = ({
                   <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
                 </marker>
               </defs>
-              <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
               {familyTree.relationships.map(relationship => {
                 const fromPerson = familyTree.people.find(p => p.id === relationship.from);
                 const toPerson = familyTree.people.find(p => p.id === relationship.to);
@@ -285,7 +284,6 @@ export const FamilyTreeCanvas: React.FC<FamilyTreeCanvasProps> = ({
                   className="drag-connection-line"
                 />
               )}
-              </g>
             </svg>
             
             {familyTree.people.map(person => (
