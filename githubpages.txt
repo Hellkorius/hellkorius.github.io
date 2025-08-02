@@ -1,0 +1,5 @@
+  npm run build
+  cp -r build/* .
+  git add .
+  git commit -m "Update site"
+  git push
