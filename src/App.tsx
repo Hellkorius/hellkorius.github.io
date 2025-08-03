@@ -63,6 +63,11 @@ function App() {
           <button onClick={handleClear} className="danger">
             Clear All
           </button>
+          {isMobile() && (
+            <button onClick={() => window.location.href = './mobile/index.html'}>
+              📱 Mobile Version
+            </button>
+          )}
         </div>
       </header>
       

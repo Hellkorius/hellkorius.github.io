@@ -28,6 +28,31 @@
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
+    
+    <!-- Mobile detection and redirect -->
+    <script>
+      (function() {
+        // Check if we should redirect to mobile version
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                         (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const forceDesktop = urlParams.get('desktop') === 'true';
+        const forceMobile = urlParams.get('mobile') === 'true';
+        
+        // Redirect to mobile version if on mobile device and not forcing desktop
+        if ((isMobile || forceMobile) && !forceDesktop && !window.location.pathname.includes('/mobile/')) {
+          window.location.href = './mobile/index.html';
+          return;
+        }
+        
+        // Add mobile indicator to desktop version
+        if (isMobile && forceDesktop) {
+          document.documentElement.setAttribute('data-mobile-device', 'true');
+        }
+      })();
+    </script>
+    
     <div id="root"></div>
     <!--
       This HTML file is a template.
