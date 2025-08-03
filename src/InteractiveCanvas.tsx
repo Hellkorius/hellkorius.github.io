@@ -352,7 +352,7 @@ export const InteractiveCanvas: React.FC<InteractiveCanvasProps> = ({
       
       <div className="debug-info">
         <small>
-          Mode: {isMobile() ? "Mobile" : "Desktop"}
+          Mode: {isMobile() ? "Mobile" : "Desktop"} | trvdition v0.0.1
         </small>
       </div>
     </div>
