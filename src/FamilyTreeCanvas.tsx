@@ -177,7 +177,7 @@ export const FamilyTreeCanvas: React.FC<FamilyTreeCanvasProps> = ({
     setInteractionMode('navigate');
   }, []);
 
-  // Global mouseup handler for connection drops
+  // Global mouseup and touchend handlers for connection drops
   React.useEffect(() => {
     const handleGlobalMouseUp = (e: MouseEvent) => {
       if (dragConnection.active) {
@@ -185,9 +185,26 @@ export const FamilyTreeCanvas: React.FC<FamilyTreeCanvasProps> = ({
       }
     };
 
+    const handleGlobalTouchEnd = (e: TouchEvent) => {
+      if (dragConnection.active && e.changedTouches.length > 0) {
+        const touch = e.changedTouches[0];
+        // Create a mouse-like event for compatibility
+        const mouseEvent = new MouseEvent('mouseup', {
+          clientX: touch.clientX,
+          clientY: touch.clientY,
+          bubbles: true
+        });
+        handleConnectionDragEnd(mouseEvent);
+      }
+    };
+
     if (dragConnection.active) {
       document.addEventListener('mouseup', handleGlobalMouseUp);
-      return () => document.removeEventListener('mouseup', handleGlobalMouseUp);
+      document.addEventListener('touchend', handleGlobalTouchEnd);
+      return () => {
+        document.removeEventListener('mouseup', handleGlobalMouseUp);
+        document.removeEventListener('touchend', handleGlobalTouchEnd);
+      };
     }
   }, [dragConnection.active, handleConnectionDragEnd]);
 

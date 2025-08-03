@@ -1,6 +1,12 @@
 import React, { useState, useCallback } from 'react';
 import { Person, Relationship } from './types';
 
+// Utility function to detect mobile devices
+const isMobile = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+         (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
+};
+
 interface PersonNodeProps {
   person: Person;
   onPersonUpdate: (person: Person) => void;
@@ -34,6 +40,8 @@ export const PersonNode: React.FC<PersonNodeProps> = ({
   const [isConnecting, setIsConnecting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+  const [touchStartTime, setTouchStartTime] = useState(0);
 
   const screenToCanvasCoords = useCallback((screenX: number, screenY: number) => {
     if (!canvasRef?.current) return { x: screenX, y: screenY };
@@ -133,6 +141,125 @@ export const PersonNode: React.FC<PersonNodeProps> = ({
     }
   }, [isDragging, isConnecting, onConnectionDragEnd]);
 
+  // Touch event handlers for mobile devices
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    if (isEditing) return;
+    
+    const touch = e.touches[0];
+    setTouchStartTime(Date.now());
+    
+    // Clear any existing timer
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+    }
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (interactionMode === 'connect') {
+      // Start connection drag immediately on touch
+      setIsConnecting(true);
+      const centerX = person.x + 75;
+      const centerY = person.y + 50;
+      setDragStart({ x: centerX, y: centerY });
+      const currentPos = screenToCanvasCoords(touch.clientX, touch.clientY);
+      onConnectionDrag(person.id, { x: centerX, y: centerY }, currentPos);
+    } else if (interactionMode === 'navigate' || interactionMode === 'add-person') {
+      // Set up for potential drag operation
+      setDragStart({
+        x: touch.clientX - person.x,
+        y: touch.clientY - person.y
+      });
+      
+      // Set up long press for edit mode (mobile alternative to double-click)
+      const timer = setTimeout(() => {
+        if (interactionMode === 'navigate') {
+          setIsEditing(true);
+        }
+      }, 500); // 500ms long press
+      
+      setLongPressTimer(timer);
+    }
+    
+    onSelect();
+  }, [person.x, person.y, person.id, interactionMode, isEditing, onSelect, onConnectionDrag, screenToCanvasCoords, longPressTimer]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    
+    const touch = e.touches[0];
+    const moveThreshold = 10; // pixels
+    const timeSinceStart = Date.now() - touchStartTime;
+    
+    // Cancel long press if moved too much
+    if (longPressTimer) {
+      const deltaX = Math.abs(touch.clientX - (person.x + dragStart.x));
+      const deltaY = Math.abs(touch.clientY - (person.y + dragStart.y));
+      
+      if (deltaX > moveThreshold || deltaY > moveThreshold) {
+        clearTimeout(longPressTimer);
+        setLongPressTimer(null);
+        
+        // Start dragging if we've moved enough and it's been a short time
+        if (timeSinceStart < 200 && (interactionMode === 'navigate' || interactionMode === 'add-person')) {
+          setIsDragging(true);
+        }
+      }
+    }
+    
+    if (isDragging) {
+      const newX = touch.clientX - dragStart.x;
+      const newY = touch.clientY - dragStart.y;
+      
+      const gridSize = 20;
+      const snappedX = Math.round(newX / gridSize) * gridSize;
+      const snappedY = Math.round(newY / gridSize) * gridSize;
+      
+      onPersonUpdate({ 
+        ...person, 
+        x: snappedX, 
+        y: snappedY 
+      });
+    } else if (isConnecting) {
+      const currentPos = screenToCanvasCoords(touch.clientX, touch.clientY);
+      onConnectionDrag(person.id, dragStart, currentPos);
+    }
+  }, [isDragging, isConnecting, dragStart, person, onPersonUpdate, onConnectionDrag, screenToCanvasCoords, longPressTimer, touchStartTime, interactionMode]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    // Clear long press timer
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+    
+    const touchDuration = Date.now() - touchStartTime;
+    
+    if (isDragging) {
+      setIsDragging(false);
+    } else if (isConnecting) {
+      setIsConnecting(false);
+      
+      // Check for connection target
+      if (e.changedTouches.length > 0) {
+        const touch = e.changedTouches[0];
+        const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
+        const personNode = targetElement?.closest('[data-person-id]') as HTMLElement;
+        
+        if (personNode && personNode.dataset.personId !== person.id) {
+          // Connection will be handled by the target person's touch handler
+          onSelect();
+        }
+      }
+      
+      onConnectionDragEnd();
+    } else if (interactionMode === 'connect' && touchDuration < 200) {
+      // Quick tap in connect mode - target for connection
+      onSelect();
+    }
+  }, [isDragging, isConnecting, longPressTimer, touchStartTime, interactionMode, person.id, onConnectionDragEnd, onSelect]);
+
   React.useEffect(() => {
     if (isDragging || isConnecting) {
       document.addEventListener('mousemove', handleMouseMove);
@@ -145,6 +272,15 @@ export const PersonNode: React.FC<PersonNodeProps> = ({
     }
   }, [isDragging, isConnecting, handleMouseMove, handleGlobalMouseUp]);
 
+  // Cleanup long press timer on unmount
+  React.useEffect(() => {
+    return () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+      }
+    };
+  }, [longPressTimer]);
+
   const handleNameChange = (name: string) => {
     onPersonUpdate({ ...person, name });
   };
@@ -154,7 +290,7 @@ export const PersonNode: React.FC<PersonNodeProps> = ({
   };
 
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
-    if (interactionMode === 'navigate') {
+    if (interactionMode === 'navigate' && !isMobile()) {
       e.stopPropagation();
       setIsEditing(true);
     }
@@ -288,7 +424,10 @@ export const PersonNode: React.FC<PersonNodeProps> = ({
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
       onDoubleClick={handleDoubleClick}
-      title="Double-click to edit"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      title={isMobile() ? "Long press to edit" : "Double-click to edit"}
       data-person-id={person.id}
     >
       <div className="person-display">

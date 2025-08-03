@@ -474,3 +474,139 @@ main {
 .submit-btn:hover {
   background: #0056b3;
 }
+
+/* Mobile-specific improvements */
+@media (max-width: 768px) {
+  .App-header {
+    padding: 0.5rem;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .App-header h1 {
+    font-size: 1.2rem;
+  }
+  
+  .header-actions {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .header-actions button {
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+    min-height: 44px; /* Minimum touch target size */
+  }
+  
+  .toolbar {
+    padding: 0.5rem;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .mode-controls {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .mode-controls button {
+    min-height: 44px;
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+  }
+  
+  .canvas-controls {
+    flex-direction: row;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .canvas-controls button {
+    min-height: 44px;
+    min-width: 44px;
+    font-size: 1.1rem;
+  }
+  
+  .person-node {
+    min-height: 44px; /* Minimum touch target */
+    touch-action: none; /* Prevent browser gestures */
+  }
+  
+  .person-node.editing {
+    z-index: 1000; /* Ensure edit form is on top on mobile */
+  }
+  
+  .person-edit-form {
+    background: white;
+    border: 2px solid #007bff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    min-width: 250px;
+  }
+  
+  .person-edit-form input,
+  .person-edit-form select {
+    min-height: 44px;
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+  
+  .edit-actions button {
+    min-height: 44px;
+    padding: 0.6rem 1rem;
+  }
+  
+  .navigation-help {
+    bottom: 60px; /* Make room for mobile browser UI */
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+  }
+  
+  .mode-instruction {
+    bottom: 100px; /* Position above navigation help */
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    background: rgba(0, 123, 255, 0.9);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-actions button {
+    padding: 0.5rem 0.8rem;
+    font-size: 0.8rem;
+  }
+  
+  .person-edit-form {
+    min-width: 200px;
+    max-width: 90vw;
+  }
+  
+  .connection-controls {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  
+  .connection-controls select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}
+
+.debug-info {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  pointer-events: none;
+  font-family: monospace;
+  z-index: 1000;
+}
