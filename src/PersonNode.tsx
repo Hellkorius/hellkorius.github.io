@@ -141,6 +141,39 @@ export const PersonNode: React.FC<PersonNodeProps> = ({
     }
   }, [isDragging, isConnecting, onConnectionDragEnd]);
 
+  const handleGlobalTouchMove = useCallback((e: TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    
+    const touch = e.touches[0];
+    
+    if (isDragging) {
+      const newX = touch.clientX - dragStart.x;
+      const newY = touch.clientY - dragStart.y;
+      
+      const gridSize = 20;
+      const snappedX = Math.round(newX / gridSize) * gridSize;
+      const snappedY = Math.round(newY / gridSize) * gridSize;
+      
+      onPersonUpdate({ 
+        ...person, 
+        x: snappedX, 
+        y: snappedY 
+      });
+    } else if (isConnecting) {
+      const currentPos = screenToCanvasCoords(touch.clientX, touch.clientY);
+      onConnectionDrag(person.id, dragStart, currentPos);
+    }
+  }, [isDragging, isConnecting, dragStart, person, onPersonUpdate, onConnectionDrag, screenToCanvasCoords]);
+
+  const handleGlobalTouchEnd = useCallback(() => {
+    if (isDragging) {
+      setIsDragging(false);
+    } else if (isConnecting) {
+      setIsConnecting(false);
+      onConnectionDragEnd();
+    }
+  }, [isDragging, isConnecting, onConnectionDragEnd]);
+
   // Touch event handlers for mobile devices
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length !== 1) return;
@@ -239,38 +272,30 @@ export const PersonNode: React.FC<PersonNodeProps> = ({
     if (isDragging) {
       setIsDragging(false);
     } else if (isConnecting) {
-      setIsConnecting(false);
-      
-      // Check for connection target
-      if (e.changedTouches.length > 0) {
-        const touch = e.changedTouches[0];
-        const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
-        const personNode = targetElement?.closest('[data-person-id]') as HTMLElement;
-        
-        if (personNode && personNode.dataset.personId !== person.id) {
-          // Connection will be handled by the target person's touch handler
-          onSelect();
-        }
-      }
-      
+      // Don't reset connecting state here - let the global handler manage it
+      // This allows the connection to complete properly
       onConnectionDragEnd();
     } else if (interactionMode === 'connect' && touchDuration < 200) {
       // Quick tap in connect mode - target for connection
       onSelect();
     }
-  }, [isDragging, isConnecting, longPressTimer, touchStartTime, interactionMode, person.id, onConnectionDragEnd, onSelect]);
+  }, [isDragging, isConnecting, longPressTimer, touchStartTime, interactionMode, onConnectionDragEnd, onSelect]);
 
   React.useEffect(() => {
     if (isDragging || isConnecting) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleGlobalMouseUp);
+      document.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
+      document.addEventListener('touchend', handleGlobalTouchEnd);
       
       return () => {
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleGlobalMouseUp);
+        document.removeEventListener('touchmove', handleGlobalTouchMove);
+        document.removeEventListener('touchend', handleGlobalTouchEnd);
       };
     }
-  }, [isDragging, isConnecting, handleMouseMove, handleGlobalMouseUp]);
+  }, [isDragging, isConnecting, handleMouseMove, handleGlobalMouseUp, handleGlobalTouchMove, handleGlobalTouchEnd]);
 
   // Cleanup long press timer on unmount
   React.useEffect(() => {

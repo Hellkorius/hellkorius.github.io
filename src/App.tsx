@@ -4,6 +4,12 @@ import { FamilyTree } from './types';
 import { FamilyTreeCanvas } from './FamilyTreeCanvas';
 import { saveFamilyTree, loadFamilyTree, exportFamilyTree, importFamilyTree } from './storage';
 
+// Utility function to detect mobile devices
+const isMobile = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+         (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
+};
+
 function App() {
   const [familyTree, setFamilyTree] = useState<FamilyTree>({ people: [], relationships: [] });
   const canvasResetRef = useRef<(() => void) | null>(null);
@@ -41,7 +47,12 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>Family Tree Builder</h1>
+        <div className="header-title">
+          <h1>Family Tree Builder</h1>
+          <span className="version-info">
+            {isMobile() ? "Mobile" : "Desktop"} | trvdition v0.0.1
+          </span>
+        </div>
         <div className="header-actions">
           <button onClick={() => exportFamilyTree(familyTree)}>
             Export Tree
