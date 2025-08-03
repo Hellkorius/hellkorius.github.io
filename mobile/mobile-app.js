@@ -315,8 +315,7 @@ const MobilePersonEditor = ({ person, onSubmit, onCancel, onDelete }) => {
         placeholder: 'Name',
         value: formData.name,
         onChange: (e) => setFormData({...formData, name: e.target.value}),
-        style: inputStyle,
-        autoFocus: true
+        style: inputStyle
       }),
       
       React.createElement('input', {
@@ -378,12 +377,13 @@ const MobilePersonEditor = ({ person, onSubmit, onCancel, onDelete }) => {
 };
 
 // Mobile Canvas Component
-const MobileCanvas = ({ children, onCanvasTouch, scale, offset }) => {
+const MobileCanvas = ({ children, onCanvasTouch, scale, offset, onOffsetChange, mode }) => {
   const canvasRef = useRef(null);
   const [isPanning, setIsPanning] = useState(false);
   const [isZooming, setIsZooming] = useState(false);
   const [lastTouchCenter, setLastTouchCenter] = useState({ x: 0, y: 0 });
   const [lastTouchDistance, setLastTouchDistance] = useState(0);
+  const [touchStartTime, setTouchStartTime] = useState(0);
 
   const getTouchDistance = (touches) => {
     if (touches.length < 2) return 0;
@@ -409,6 +409,7 @@ const MobileCanvas = ({ children, onCanvasTouch, scale, offset }) => {
 
   const handleTouchStart = useCallback((e) => {
     const target = e.target;
+    setTouchStartTime(Date.now());
     
     // Don't handle if touching a person node
     if (target.closest('[data-person-id]')) {
@@ -420,12 +421,18 @@ const MobileCanvas = ({ children, onCanvasTouch, scale, offset }) => {
       const touch = e.touches[0];
       setLastTouchCenter({ x: touch.clientX, y: touch.clientY });
       
-      // Check if this is a canvas tap
-      if (target === canvasRef.current || target.closest('.canvas-content')) {
+      // Check if this is a canvas tap for add mode
+      if (mode === 'add' && (target === canvasRef.current || target.closest('.canvas-content'))) {
         const rect = canvasRef.current.getBoundingClientRect();
         const x = (touch.clientX - rect.left - offset.x) / scale;
         const y = (touch.clientY - rect.top - offset.y) / scale;
         onCanvasTouch(x, y);
+        return;
+      }
+      
+      // For navigate and connect modes, allow panning
+      if (mode === 'navigate' || mode === 'connect') {
+        setIsPanning(true);
       }
     } else if (e.touches.length === 2) {
       // Two finger touch - start zoom/pan
@@ -437,7 +444,48 @@ const MobileCanvas = ({ children, onCanvasTouch, scale, offset }) => {
       setLastTouchDistance(distance);
       setLastTouchCenter(center);
     }
-  }, [scale, offset, onCanvasTouch]);
+  }, [scale, offset, onCanvasTouch, mode]);
+
+  const handleTouchMove = useCallback((e) => {
+    if (e.touches.length === 1 && isPanning && (mode === 'navigate' || mode === 'connect')) {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const deltaX = touch.clientX - lastTouchCenter.x;
+      const deltaY = touch.clientY - lastTouchCenter.y;
+      
+      onOffsetChange({
+        x: offset.x + deltaX,
+        y: offset.y + deltaY
+      });
+      
+      setLastTouchCenter({ x: touch.clientX, y: touch.clientY });
+    } else if (e.touches.length === 2 && isZooming) {
+      // Handle pinch zoom (placeholder for future enhancement)
+      e.preventDefault();
+    }
+  }, [isPanning, isZooming, lastTouchCenter, offset, onOffsetChange, mode]);
+
+  const handleTouchEnd = useCallback((e) => {
+    const touchDuration = Date.now() - touchStartTime;
+    
+    if (e.touches.length === 0) {
+      setIsPanning(false);
+      setIsZooming(false);
+      
+      // If it was a quick tap and not in add mode, might be for connect mode
+      if (touchDuration < 200 && mode === 'connect' && !isPanning) {
+        const target = e.target;
+        if (target === canvasRef.current || target.closest('.canvas-content')) {
+          // Cancel any active connection
+          const rect = canvasRef.current.getBoundingClientRect();
+          const touch = e.changedTouches[0];
+          const x = (touch.clientX - rect.left - offset.x) / scale;
+          const y = (touch.clientY - rect.top - offset.y) / scale;
+          onCanvasTouch(x, y);
+        }
+      }
+    }
+  }, [touchStartTime, mode, isPanning, offset, scale, onCanvasTouch]);
 
   const canvasStyle = {
     width: '100%',
@@ -461,12 +509,147 @@ const MobileCanvas = ({ children, onCanvasTouch, scale, offset }) => {
   return React.createElement('div', {
     ref: canvasRef,
     style: canvasStyle,
-    onTouchStart: handleTouchStart
+    onTouchStart: handleTouchStart,
+    onTouchMove: handleTouchMove,
+    onTouchEnd: handleTouchEnd
   }, 
     React.createElement('div', {
       className: 'canvas-content',
       style: contentStyle
     }, children)
+  );
+};
+
+// Mobile Menu Component
+const MobileMenu = ({ isOpen, onClose, onExport, onImport, onClear, onDesktop }) => {
+  if (!isOpen) return null;
+
+  const overlayStyle = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    zIndex: 10000,
+    padding: '20px'
+  };
+
+  const menuStyle = {
+    background: 'white',
+    borderRadius: '16px 16px 0 0',
+    width: '100%',
+    maxWidth: '400px',
+    padding: '24px',
+    boxShadow: '0 -10px 40px rgba(0,0,0,0.3)',
+    animation: 'slideUp 0.3s ease'
+  };
+
+  const titleStyle = {
+    fontSize: '18px',
+    fontWeight: '600',
+    marginBottom: '20px',
+    textAlign: 'center',
+    color: '#333'
+  };
+
+  const buttonStyle = {
+    width: '100%',
+    padding: '16px',
+    margin: '8px 0',
+    border: 'none',
+    borderRadius: '12px',
+    fontSize: '16px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    transition: 'all 0.2s ease'
+  };
+
+  const primaryButtonStyle = {
+    ...buttonStyle,
+    background: '#007bff',
+    color: 'white'
+  };
+
+  const secondaryButtonStyle = {
+    ...buttonStyle,
+    background: '#f8f9fa',
+    color: '#495057',
+    border: '1px solid #dee2e6'
+  };
+
+  const dangerButtonStyle = {
+    ...buttonStyle,
+    background: '#dc3545',
+    color: 'white'
+  };
+
+  const cancelButtonStyle = {
+    ...buttonStyle,
+    background: '#6c757d',
+    color: 'white',
+    marginTop: '16px'
+  };
+
+  return React.createElement('div', { 
+    style: overlayStyle,
+    onClick: (e) => e.target === e.currentTarget && onClose()
+  }, 
+    React.createElement('div', { style: menuStyle }, [
+      React.createElement('h3', { 
+        key: 'title',
+        style: titleStyle
+      }, 'Menu'),
+      
+      React.createElement('button', {
+        key: 'export',
+        style: primaryButtonStyle,
+        onClick: () => { onExport(); onClose(); }
+      }, [
+        React.createElement('span', { key: 'icon' }, '📁'),
+        React.createElement('span', { key: 'text' }, 'Export Tree')
+      ]),
+      
+      React.createElement('button', {
+        key: 'import',
+        style: secondaryButtonStyle,
+        onClick: () => { onImport(); onClose(); }
+      }, [
+        React.createElement('span', { key: 'icon' }, '📂'),
+        React.createElement('span', { key: 'text' }, 'Import Tree')
+      ]),
+      
+      React.createElement('button', {
+        key: 'desktop',
+        style: secondaryButtonStyle,
+        onClick: () => { onDesktop(); onClose(); }
+      }, [
+        React.createElement('span', { key: 'icon' }, '🖥️'),
+        React.createElement('span', { key: 'text' }, 'Desktop Version')
+      ]),
+      
+      React.createElement('button', {
+        key: 'clear',
+        style: dangerButtonStyle,
+        onClick: () => { onClear(); onClose(); }
+      }, [
+        React.createElement('span', { key: 'icon' }, '🗑️'),
+        React.createElement('span', { key: 'text' }, 'Clear All Data')
+      ]),
+      
+      React.createElement('button', {
+        key: 'cancel',
+        style: cancelButtonStyle,
+        onClick: onClose
+      }, 'Cancel')
+    ])
   );
 };
 
@@ -481,6 +664,7 @@ const MobileFamilyTreeApp = () => {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [showAddForm, setShowAddForm] = useState(false);
   const [addPosition, setAddPosition] = useState({ x: 0, y: 0 });
+  const [showMenu, setShowMenu] = useState(false);
 
   // Load data on mount
   useEffect(() => {
@@ -683,14 +867,7 @@ const MobileFamilyTreeApp = () => {
           borderRadius: '6px',
           fontSize: '14px'
         },
-        onClick: () => {
-          const actions = ['Export', 'Import', 'Clear All', 'Desktop Version', 'Cancel'];
-          const choice = prompt('Choose action:\n0: Export\n1: Import\n2: Clear All\n3: Desktop Version\n4: Cancel');
-          if (choice === '0') exportFamilyTree(familyTree);
-          else if (choice === '1') handleImport();
-          else if (choice === '2') handleClear();
-          else if (choice === '3') window.location.href = '../index.html?desktop=true';
-        }
+        onClick: () => setShowMenu(true)
       }, '⋯')
     ]),
 
@@ -759,7 +936,9 @@ const MobileFamilyTreeApp = () => {
       React.createElement(MobileCanvas, {
         onCanvasTouch: handleCanvasTouch,
         scale,
-        offset
+        offset,
+        onOffsetChange: setOffset,
+        mode
       }, [
         // People
         ...familyTree.people.map(person =>
@@ -866,6 +1045,17 @@ const MobileFamilyTreeApp = () => {
       key: 'add-form',
       onSubmit: addPerson,
       onCancel: () => setShowAddForm(false)
+    }),
+
+    // Menu
+    React.createElement(MobileMenu, {
+      key: 'menu',
+      isOpen: showMenu,
+      onClose: () => setShowMenu(false),
+      onExport: () => exportFamilyTree(familyTree),
+      onImport: handleImport,
+      onClear: handleClear,
+      onDesktop: () => window.location.href = '../index.html?desktop=true'
     })
   ]);
 };
@@ -944,8 +1134,7 @@ const AddPersonForm = ({ onSubmit, onCancel }) => {
         placeholder: 'Name (required)',
         value: formData.name,
         onChange: (e) => setFormData({...formData, name: e.target.value}),
-        style: inputStyle,
-        autoFocus: true
+        style: inputStyle
       }),
       
       React.createElement('input', {
