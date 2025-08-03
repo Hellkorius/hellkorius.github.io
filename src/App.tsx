@@ -12,6 +12,7 @@ const isMobile = () => {
 
 function App() {
   const [familyTree, setFamilyTree] = useState<FamilyTree>({ people: [], relationships: [] });
+  const [version, setVersion] = useState<{ version: string; name: string }>({ version: '0.0.1', name: 'trvdition' });
   const canvasResetRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -19,6 +20,12 @@ function App() {
     setFamilyTree(saved);
     // Reset view to origin when loading
     setTimeout(() => canvasResetRef.current?.(), 100);
+    
+    // Load version info
+    fetch('./version.json')
+      .then(response => response.json())
+      .then(data => setVersion(data))
+      .catch(error => console.log('Could not load version:', error));
   }, []);
 
   useEffect(() => {
@@ -50,7 +57,7 @@ function App() {
         <div className="header-title">
           <h1>Family Tree Builder</h1>
           <span className="version-info">
-            {isMobile() ? "Mobile" : "Desktop"} | trvdition v0.0.1
+            {isMobile() ? "Mobile" : "Desktop"} | {version.name} v{version.version}
           </span>
         </div>
         <div className="header-actions">

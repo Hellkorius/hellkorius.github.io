@@ -665,11 +665,18 @@ const MobileFamilyTreeApp = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [addPosition, setAddPosition] = useState({ x: 0, y: 0 });
   const [showMenu, setShowMenu] = useState(false);
+  const [version, setVersion] = useState({ version: '0.0.1', name: 'trvdition' });
 
   // Load data on mount
   useEffect(() => {
     const saved = loadFamilyTree();
     setFamilyTree(saved);
+    
+    // Load version info
+    fetch('../version.json')
+      .then(response => response.json())
+      .then(data => setVersion(data))
+      .catch(error => console.log('Could not load version:', error));
   }, []);
 
   // Auto-save changes
@@ -722,6 +729,13 @@ const MobileFamilyTreeApp = () => {
     setFamilyTree(prev => ({
       ...prev,
       relationships: [...prev.relationships, newRelationship]
+    }));
+  }, []);
+
+  const deleteRelationship = useCallback((id) => {
+    setFamilyTree(prev => ({
+      ...prev,
+      relationships: prev.relationships.filter(r => r.id !== id)
     }));
   }, []);
 
@@ -855,7 +869,7 @@ const MobileFamilyTreeApp = () => {
     React.createElement('header', { key: 'header', style: headerStyle }, [
       React.createElement('div', { key: 'title' }, [
         React.createElement('h1', { style: titleStyle }, 'Family Tree'),
-        React.createElement('div', { style: versionStyle }, 'Mobile | trvdition v0.0.1')
+        React.createElement('div', { style: versionStyle }, `Mobile | ${version.name} v${version.version}`)
       ]),
       React.createElement('button', {
         key: 'menu',
@@ -964,7 +978,7 @@ const MobileFamilyTreeApp = () => {
             left: 0,
             width: '100%',
             height: '100%',
-            pointerEvents: 'none',
+            pointerEvents: 'auto',
             overflow: 'visible',
             zIndex: 0
           }
@@ -993,6 +1007,9 @@ const MobileFamilyTreeApp = () => {
             const toX = toPerson.x + 60;
             const toY = toPerson.y + 30;
             
+            const midX = (fromX + toX) / 2;
+            const midY = (fromY + toY) / 2;
+            
             const getLineColor = (type) => {
               switch (type) {
                 case 'parent': return '#dc3545';
@@ -1002,16 +1019,81 @@ const MobileFamilyTreeApp = () => {
               }
             };
             
-            return React.createElement('line', {
-              key: relationship.id,
-              x1: fromX,
-              y1: fromY,
-              x2: toX,
-              y2: toY,
-              stroke: getLineColor(relationship.type),
-              strokeWidth: 2,
-              markerEnd: 'url(#arrowhead)'
-            });
+            const getTypeLabel = (type) => {
+              switch (type) {
+                case 'parent': return 'Parent';
+                case 'spouse': return 'Spouse';
+                case 'child': return 'Child';
+                default: return type;
+              }
+            };
+            
+            return React.createElement('g', { key: relationship.id }, [
+              // Connection line
+              React.createElement('line', {
+                key: 'line',
+                x1: fromX,
+                y1: fromY,
+                x2: toX,
+                y2: toY,
+                stroke: getLineColor(relationship.type),
+                strokeWidth: 3,
+                markerEnd: 'url(#arrowhead)',
+                style: { cursor: 'pointer' },
+                onTouchStart: (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                },
+                onTouchEnd: (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (confirm(`Delete ${getTypeLabel(relationship.type).toLowerCase()} relationship?`)) {
+                    deleteRelationship(relationship.id);
+                  }
+                }
+              }),
+              
+              // Label background
+              React.createElement('rect', {
+                key: 'label-bg',
+                x: midX - 25,
+                y: midY - 10,
+                width: 50,
+                height: 20,
+                fill: 'white',
+                stroke: getLineColor(relationship.type),
+                strokeWidth: 1,
+                rx: 10,
+                style: { cursor: 'pointer' },
+                onTouchStart: (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                },
+                onTouchEnd: (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (confirm(`Delete ${getTypeLabel(relationship.type).toLowerCase()} relationship?`)) {
+                    deleteRelationship(relationship.id);
+                  }
+                }
+              }),
+              
+              // Label text
+              React.createElement('text', {
+                key: 'label-text',
+                x: midX,
+                y: midY + 4,
+                textAnchor: 'middle',
+                fontSize: '10',
+                fontWeight: '500',
+                fill: getLineColor(relationship.type),
+                style: { 
+                  cursor: 'pointer',
+                  pointerEvents: 'none',
+                  userSelect: 'none'
+                }
+              }, getTypeLabel(relationship.type))
+            ]);
           })
         ]),
 
